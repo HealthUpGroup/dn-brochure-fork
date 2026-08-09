@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build --configuration production",
+    "build:sandbox": "ng build --configuration sandbox",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
