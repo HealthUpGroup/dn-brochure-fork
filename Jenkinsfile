@@ -1,8 +1,10 @@
 // DN-BROCHURE frontend (Angular 21) — build in Docker on apd.local, deploy to file.drugnetcenter.com.
 // Modelled on ../dninhouse/Jenkinsfile: same agent, same SSH credential, same atomic .new/.bak swap.
 //
+// Stages: Checkout → Build → Unit test → Archive → Approve PROD (prod only) → Deploy
+//
 // Multibranch-ready: use a "Multibranch Pipeline" job pointed at this repo. Every branch & PR is
-// built + archived; only the deploy branches push to a web root:
+// built + tested + archived; only the deploy branches push to a web root:
 //   branch dev  → sandbox.promotion.drugnetcenter.com   (DEV)
 //   branch prod → promotion.drugnetcenter.com           (PROD, live)
 // other branches / PRs are build-only.
@@ -91,6 +93,29 @@ pipeline {
           mkdir -p "${WORKSPACE}/.home" "${WORKSPACE}/.npm"
           docker run --rm -u $(id -u):$(id -g) -e HOME=/app/.home -e npm_config_cache=/app/.npm -e CI=true -e NODE_OPTIONS=${NODE_OPTS} -v "${WORKSPACE}:/app" -w /app ${NODE_IMAGE} bash -c "node -v && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) && npm run ${BUILD_SCRIPT}"
           test -f "${DIST_DIR}/index.html"
+        '''
+      }
+    }
+
+    stage('Unit test') {
+      // ลำดับ Build → Unit test → Archive ตั้งใจแบบนี้:
+      //   • Build ก่อน — ถ้า type error ใน app code จะได้ error ของ Angular ตรงๆ อ่านง่ายกว่า
+      //     error ตอน Karma bundle (มันพังทั้งคู่แหละ แต่ข้อความต่างกันมาก)
+      //   • Test ก่อน Archive — artifact ที่เก็บไว้จะเป็นของที่เทสต์ผ่านเท่านั้น ไม่งั้นจะมีไฟล์
+      //     ที่ดาวน์โหลดได้แต่ deploy ไม่ควร ค้างอยู่ใน Jenkins
+      // ไม่ได้เอา test ขึ้นก่อน build เพราะ Karma compile ทั้งแอปอยู่แล้ว — ไม่ใช่ smoke check ที่เร็วกว่า
+      // ยังคุ้มที่จะรันแม้ build ผ่าน: spec compile ด้วย tsconfig.spec.json คนละตัวกับ tsconfig.app.json
+      // spec พังแต่ build เขียว เป็นสถานะที่รีโปนี้เคยอยู่จริง
+      //
+      // ใช้ workspace เดียวกับ Build → node_modules + Chromium ของ puppeteer มีอยู่แล้ว ไม่ต้อง npm ci ซ้ำ
+      // CHROME_BIN ต้องชี้ Chromium ของ puppeteer — image node:22.22.0 ไม่มี browser ติดมา
+      // (puppeteer v25 executablePath() คืน Promise จึงต้อง await ก่อน)
+      // launcher ChromeHeadlessNoSandbox อยู่ใน karma.conf.js — ต้องมี --no-sandbox เพราะรันเป็น
+      // non-root uid ใน Docker
+      steps {
+        sh '''
+          set -e
+          docker run --rm -u $(id -u):$(id -g) -e HOME=/app/.home -e npm_config_cache=/app/.npm -e CI=true -v "${WORKSPACE}:/app" -w /app ${NODE_IMAGE} bash -c "export CHROME_BIN=\\$(node -e \\"Promise.resolve(require('puppeteer').executablePath()).then(p=>console.log(p))\\") && echo \\"CHROME_BIN=\\$CHROME_BIN\\" && npm run test:headless"
         '''
       }
     }
@@ -189,7 +214,9 @@ pipeline {
         curl -sS -m 10 -X POST "$TESTHUB_URL/api/notify" -H "Authorization: Bearer $TESTHUB_API_TOKEN" -H "Content-Type: application/json" -d "$BODY" || true
       '''
     }
-    always { cleanWs() }
+    // เก็บ .npm (npm cache) และ .home (puppeteer แคช Chromium ไว้ที่ HOME) ไม่ให้ถูกลบ
+    // ไม่งั้นทุก build จะโหลด dependency ใหม่หมด + โหลด Chromium ~150MB ซ้ำทุกรอบ
+    always { cleanWs(patterns: [[pattern: '.npm/**', type: 'EXCLUDE'], [pattern: '.home/**', type: 'EXCLUDE']]) }
   }
 }
 
@@ -204,6 +231,8 @@ pipeline {
 //     รีโปนี้จึงมี env แค่ 2 ชุด — configuration `sandbox` เลยชี้ environment.development.ts
 //     ตั้งใจ: sandbox = ที่ tester เทสต์ และ local ng serve ยิง backend ชุดเดียวกัน ไม่แยกไฟล์ที่ 3
 //   • prod ใช้ script `build` ที่มีอยู่เดิมในรีโป (dninhouse ใช้ `build:prod`)
+//   • มี stage 'Unit test' (dninhouse ไม่รัน unit test ใน pipeline เลย) — gate แบบ hard ทุก branch
+//     ต้องมี puppeteer + karma.conf.js (ChromeHeadlessNoSandbox) ในรีโป ดู docs/testing-notes.md
 //   • ไม่มี stage E2E (TestHub smoke) — brochure ยังไม่มี suite ใน TestHub. ถ้ามีเมื่อไหร่
 //     ลอกจาก ../dninhouse/Jenkinsfile stage 'E2E (TestHub smoke)' ได้เลย (รันเฉพาะ dev, report-only)
 //   • ไม่ใช้ --legacy-peer-deps — dependency tree ของ Angular 21 สะอาด (ยืนยันจาก npm ci จริง)
