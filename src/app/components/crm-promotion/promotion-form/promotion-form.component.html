@@ -76,6 +76,13 @@
     </div>
   </div>
 
+  <!--
+    Why the button below is disabled, in one list. The per-node alerts above only show what hangs
+    on the node they are given; a rule on a node a page renders no alert for is invisible without
+    this (the ITEM page, 2026-09-30).
+  -->
+  <app-promotion-validation-summary [formState]="promotionForm()" />
+
   <button
     class="btn btn-primary w-100"
     [disabled]="!canSubmit()"

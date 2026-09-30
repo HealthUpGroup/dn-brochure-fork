@@ -152,7 +152,10 @@ backend work that should follow. The non-obvious ones:
   continue` drops the promotion before `CollectReward` emits anything. An earlier
   version treated the value as meaningless and hid the input, which shipped 0 and
   killed every GIFT and PWP authored after that change. Integer `>= 1`, same as
-  `CHEAPEST`.
+  `CHEAPEST`. **`REGISTERFEE` is exempt**: its grant is boolean, the engine never
+  reads the value, and the page hides the box and always authors 0 — holding it to
+  the floor disabled the ค่าสมาชิก page and the live promotion's edit from
+  2026-09-20 to 09-30 with no message on screen.
 - Actions containing `"PERCENT"` cap `rewardValue` at 100.
 - Tier ladders must be monotonic once sorted by threshold — distinctness alone
   allowed "spend more, get less". Skipped for `PRICE` actions only (they invert:
@@ -172,6 +175,9 @@ backend work that should follow. The non-obvious ones:
   FilterValue : 1`), so 0 only ever worked because a fallback rescued it, and was
   ambiguous between "EXIST, deliberately" and "nobody filled this in". The API
   lifts a posted 0 to 1 rather than rejecting it, so older clients are unaffected.
+  `promotionDetailToForm` opens a stored 0 as 1 for the same reason: 53 of the 90
+  live ITEM promotions still hold 0, and the ITEM page has no box to change it, so
+  without the lift their edit page was blocked.
 - ⚠️ **`filterType` itself is carried end-to-end and read by nothing.**
   `CrmPromotionEngine` never references it — only `filterValue` and the good
   codes. A `SUBTOTAL` group was therefore authored in baht
@@ -236,6 +242,20 @@ members.
   seed zeros that the schema legitimately rejects. Container/cross-field nodes
   (tier ladder, filter groups, date range) need `[alwaysShow]="true"` — nothing
   ever marks them touched, so gating alone would silence them permanently.
+- **Every blocking rule is also listed above the submit button** by
+  `PromotionValidationSummaryComponent` (`components/crm-promotion/
+  promotion-validation-summary/`), which reads the root's `errorSummary()` and
+  names each error's section and field via `lib/crm-promotion/form-error-location.ts`.
+  It is not gated on `touched`: it exists to explain a disabled button. The
+  per-node alerts alone cannot, because a rule on a node whose alert a page does
+  not render is invisible — on 2026-09-30 every ITEM create/edit was disabled with
+  no message, since "zero threshold on repeat" hung on `promotionBenefit` and the
+  inline page renders no alert for that node. When adding a form field, add its
+  label to `FIELD_LABELS` there or the summary shows the raw key.
+- **`ITEMEXIST` is exempt from "zero threshold on repeat".** Every ITEM promotion
+  is threshold 0 + `isRepeat: true` by construction (all 90 live ones are); the
+  engine reads `ITEMEXIST` as a gate and returns an ITEM discount's tier value as a
+  per-unit rate before any repeat arithmetic (`CrmPromotionEngine.SelectReward`).
 - The create page component is still named
   `CreateBillDiscountPromotionComponent` but serves all three create routes.
 

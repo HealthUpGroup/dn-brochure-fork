@@ -31,6 +31,7 @@ import { PromotionMasterComponent } from '../create-promotion-subform/promotion-
 import { PromotionDatetimeComponent } from '../create-promotion-subform/promotion-datetime/promotion-datetime.component';
 import { PromotionLimitUsageComponent } from '../create-promotion-subform/promotion-limit-usage/promotion-limit-usage.component';
 import { PromotionProductFilterComponent } from '../create-promotion-subform/promotion-product-filter/promotion-product-filter.component';
+import { PromotionValidationSummaryComponent } from '../promotion-validation-summary/promotion-validation-summary.component';
 
 @Component({
   selector: 'app-promotion-form',
@@ -42,6 +43,7 @@ import { PromotionProductFilterComponent } from '../create-promotion-subform/pro
     PromotionDatetimeComponent,
     PromotionLimitUsageComponent,
     PromotionProductFilterComponent,
+    PromotionValidationSummaryComponent,
   ],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './promotion-form.component.html',

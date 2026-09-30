@@ -27,6 +27,7 @@ import {
 import {
   CHEAPEST_ACTION,
   POOL_PERCENT_TYPE,
+  REGISTER_FEE_ACTION,
   SPEND_THRESHOLD,
   THRESHOLD_RULES,
   isPoolOnlyAction,
@@ -296,10 +297,17 @@ export const promotionBenefitSchema = schema<TPromotionBenefit>((_path) => {
     // `if (reward <= 0) continue` drops the promotion before CollectReward emits a
     // single gift or entitlement. Exempting them here shipped 0 and killed every
     // GIFT and PWP authored since.
+    //
+    // REGISTERFEE IS exempt: its grant is boolean (the register SKU goes on the bill at
+    // 0 baht, or it does not), the engine tests it before the reward guard and never reads
+    // the value, and the page hides the box and always authors 0. Holding it to the floor
+    // disabled the ค่าสมาชิก page and the edit of the live one from 2026-09-20 to 09-30.
     required(p.rewardValue, { message: 'ต้องระบุจำนวน' });
     applyWhen(
       p.rewardValue,
-      ({ valueOf }) => !isPriceAction(valueOf(_path.action)),
+      ({ valueOf }) =>
+        !isPriceAction(valueOf(_path.action)) &&
+        valueOf(_path.action) !== REGISTER_FEE_ACTION,
       (rv) => {
         min(rv, 1, { message: 'จำนวนต้องมากกว่า 0' });
       },
@@ -390,9 +398,16 @@ export const promotionBenefitSchema = schema<TPromotionBenefit>((_path) => {
   // the threshold fits into the basket. A threshold of 0 fits infinitely often.
   // The per-type floor above already blocks this for COUNT types; this catches it
   // for BILLSUBTOTAL, where 0 is otherwise legal.
+  //
+  // ITEMEXIST is exempt. The ITEM page authors no threshold at all: every ITEM promotion is
+  // threshold 0 + isRepeat true by construction (all 90 live ones are), and the engine reads
+  // ITEMEXIST as a GATE -- an ITEM discount returns the tier value as a per-unit rate before the
+  // repeat arithmetic is reached (CrmPromotionEngine.SelectReward). Applying this rule to it
+  // blocked every ITEM create and edit from 2026-09-20 with no message on screen, because the
+  // error hangs here on promotionBenefit and the inline page renders no alert for that node.
   validate(_path, ({ value }) => {
-    const { isRepeat, tiers } = value();
-    if (!isRepeat) return null;
+    const { isRepeat, tiers, thresholdType } = value();
+    if (!isRepeat || thresholdType === 'ITEMEXIST') return null;
     return tiers.some((t) => t.thresholdValue <= 0)
       ? {
           kind: 'zero threshold on repeat',

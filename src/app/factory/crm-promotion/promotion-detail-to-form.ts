@@ -55,9 +55,14 @@ export function promotionDetailToForm(d: TPromotionDetail): TCreatePromotionForm
       isBranchSpecific: d.isBranchSpecific,
       branches: d.branches,
     },
+    // A stored 0 opens as 1. Older rows (53 of the 90 live ITEM promotions, 2026-09-30) hold
+    // filterValue 0 from before the form wrote 1 for EXIST; the schema rejects 0, the ITEM page
+    // has no box to change it, so every one of them was un-editable. 1 is what 0 has always
+    // meant: the engine reads `required = FilterValue > 0 ? FilterValue : 1`, and the API lifts
+    // a posted 0 to 1 -- saving back 1 changes nothing at the till.
     promotionFilter: d.filterList.map(f => ({
       filterType: f.filterType,
-      filterValue: f.filterValue,
+      filterValue: f.filterValue > 0 ? f.filterValue : 1,
       productList: f.productList,
     })),
     promotionBenefit: {

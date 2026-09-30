@@ -137,6 +137,21 @@ describe('createPromotionSchema — threshold floor per thresholdType', () => {
   });
 });
 
+describe('createPromotionSchema — reward floor exemptions', () => {
+  it('accepts a 0 reward on REGISTERFEE: the grant is boolean and the page hides the box', () => {
+    // The floor added 2026-09-20 disabled the ค่าสมาชิก page and the live promotion's edit
+    // with no message: the reward input is not rendered on that page.
+    const r = validityOf({
+      action: 'REGISTERFEE',
+      thresholdType: 'BILLSUBTOTAL',
+      isRepeat: false,
+      tiers: [{ thresholdValue: 1000, rewardValue: 0 }],
+    });
+    expect(r.rewardErrors).toEqual([]);
+    expect(r.benefitValid).toBeTrue();
+  });
+});
+
 describe('createPromotionSchema — repeating rung', () => {
   // BILLSUBTOTAL 0 is legal on a one-shot tier but not on a repeating one, where
   // it divides into the basket an unbounded number of times.
@@ -148,6 +163,34 @@ describe('createPromotionSchema — repeating rung', () => {
       tiers: [{ thresholdValue: 0, rewardValue: 50 }],
     });
     expect(r.errors).toContain('zero threshold on repeat');
+  });
+
+  it('leaves an ITEM promotion alone: ITEMEXIST is a gate, and its threshold is never authored', () => {
+    // Every live ITEM promotion is threshold 0 + isRepeat true; the engine returns the tier
+    // value as a per-unit rate for ITEM discounts and never divides by the threshold. This
+    // rule blocked all of them (create and edit) from 2026-09-20 with no message on screen.
+    for (const action of ['ITEMBATHDISC', 'ITEMPERCENTDISC', 'ITEMPRICE']) {
+      const r = validityOf(
+        {
+          action,
+          thresholdType: 'ITEMEXIST',
+          isRepeat: true,
+          tiers: [{ thresholdValue: 0, rewardValue: action === 'ITEMPRICE' ? 0 : 5 }],
+        },
+        {
+          promotionType: 'ITEM',
+          filter: [
+            {
+              filterType: 'EXIST',
+              filterValue: 1,
+              productList: [{ goodCode: 'A1', goodName: 'ยา A', sku: '1' }],
+            },
+          ],
+        },
+      );
+      expect(r.errors).withContext(action).not.toContain('zero threshold on repeat');
+      expect(r.benefitValid).withContext(action).toBeTrue();
+    }
   });
 
   it('allows a 0 threshold when isRepeat is false', () => {
