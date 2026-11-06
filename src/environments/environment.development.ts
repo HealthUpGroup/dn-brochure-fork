@@ -11,6 +11,7 @@ export const environment = {
     brochureEndpoint: "https://dev.drugnetcenter.com/ItemService2",
     // imagePath ใช้ร่วมกับ prod — ไม่มี dev counterpart (dninhouse ก็ pin fileServer เป็น prod ทุก env)
     imagePath: "https://file.drugnetcenter.com/drugpos/GoodPictures",
+    // cnPath ยังชี้ prod ตาม upstream/prod (upstream ย้ายแค่ brochure + ibob ไป dev.*)
     cnPath: "https://api.drugnetcenter.com/ReturnRequest",
     ibob: "https://dev.drugnetcenter.com/IbOb",
     // Other Income มี backend แยก sandbox (deploy จาก branch dev ของ repo other-income-api)

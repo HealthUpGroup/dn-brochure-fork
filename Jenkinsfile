@@ -1,4 +1,4 @@
-// DN-BROCHURE frontend (Angular 21) — build in Docker on apd.local, deploy to file.drugnetcenter.com.
+// DN-BROCHURE frontend (Angular 22) — build in Docker on apd.local, deploy to file.drugnetcenter.com.
 // Modelled on ../dninhouse/Jenkinsfile: same agent, same SSH credential, same atomic .new/.bak swap.
 //
 // Stages: Checkout → Build → Archive → Approve PROD (prod only) → Deploy
@@ -25,7 +25,7 @@
 //   • builder = @angular-devkit/build-angular:application → dist มีโฟลเดอร์ย่อย /browser
 //     ของจริงคือ dist/dn-prochure/browser/index.html  (dninhouse ใช้ builder :browser จึงไม่มี /browser)
 //   • ชื่อโปรเจกต์ใน angular.json สะกดว่า "dn-prochure" (ไม่ใช่ brochure) — path ต้องตามนั้น
-//   • Node 22.22.0 (package.json engines + .nvmrc pin ไว้ตรงตัว) — ไม่ใช่ Node 20
+//   • Node 22.22.3 (.nvmrc; package.json engines = ^22.22.3 || ^24.15.0) — ไม่ใช่ Node 20
 //   • build script แยกตาม branch (ดู BUILD_SCRIPT ใน stage 'Build') — ชื่อ script ตรงกับ dninhouse:
 //       prod → `npm run build`         (= --configuration production → src/environments/environment.ts)
 //       dev  → `npm run build:sandbox` (= --configuration sandbox    → environment.development.ts)
@@ -44,7 +44,7 @@ pipeline {
   }
 
   environment {
-    NODE_IMAGE  = 'node:22.22.0'                  // ตรงกับ .nvmrc / engines pin
+    NODE_IMAGE  = 'node:22.22.3'                  // ตรงกับ .nvmrc / engines pin
     DIST_DIR    = 'dist/dn-prochure/browser'      // builder :application → มี /browser (ยืนยันจาก build จริง)
     NODE_OPTS   = '--max_old_space_size=4096'     // esbuild กินน้อยกว่า webpack แต่กันไว้
     DEPLOY_HOST = 'px@file.drugnetcenter.com'
@@ -69,7 +69,7 @@ pipeline {
     }
 
     stage('Build (Docker)') {
-      // Build inside node:22.22.0 so the agent only needs Docker (no Node tool install). Run as the
+      // Build inside node:22.22.3 so the agent only needs Docker (no Node tool install). Run as the
       // jenkins uid/gid with HOME + npm cache UNDER the mounted workspace (/app) so they're writable
       // by that uid (the uid has no home in the image → npm would hit EACCES on /home/node) and
       // nothing lands root-owned (cleanWs works). The `docker run` is ONE line on purpose:
@@ -77,7 +77,7 @@ pipeline {
       //
       // npm ci ต้องออกเน็ตได้: dependency `xlsx` ดึงจาก https://cdn.sheetjs.com (tarball ตรง ไม่ใช่ registry)
       // ถ้า agent ออกเน็ตจำกัด ต้อง allow host นั้นด้วย ไม่งั้น install พัง
-      // ไม่ต้องใช้ --legacy-peer-deps (ต่างจาก dninhouse) — dependency tree ของ Angular 21 สะอาด
+      // ไม่ต้องใช้ --legacy-peer-deps (ต่างจาก dninhouse) — dependency tree ของ Angular 22 สะอาด
       //
       // Per-branch environment: prod → build (configuration production → environment.ts);
       // dev & everything else → build:sandbox (configuration sandbox → environment.development.ts)
@@ -215,6 +215,6 @@ pipeline {
 //     Karma bundle ทั้งแอปเหมือนกัน เสี่ยง heap พอกัน
 //   • ไม่มี stage E2E (TestHub smoke) — brochure ยังไม่มี suite ใน TestHub. ถ้ามีเมื่อไหร่
 //     ลอกจาก ../dninhouse/Jenkinsfile stage 'E2E (TestHub smoke)' ได้เลย (รันเฉพาะ dev, report-only)
-//   • ไม่ใช้ --legacy-peer-deps — dependency tree ของ Angular 21 สะอาด (ยืนยันจาก npm ci จริง)
+//   • ไม่ใช้ --legacy-peer-deps — dependency tree ของ Angular 22 สะอาด (ยืนยันจาก npm ci จริง)
 //   • builder :application → DIST_DIR มี /browser (dninhouse builder :browser จึงไม่มี)
 // ─────────────────────────────────────────────────────────────────────────────
